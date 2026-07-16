@@ -44,6 +44,7 @@ jobs:
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       - name: Boot simulator
+        continue-on-error: true
         run: |
           UDID="${{ steps.sim.outputs.udid }}"
           xcrun simctl boot "$UDID" || true
@@ -57,8 +58,14 @@ jobs:
             kill $BOOT_PID 2>/dev/null || true
             xcrun simctl shutdown "$UDID" || true
             xcrun simctl erase "$UDID" || true
-            xcrun simctl boot "$UDID"
-            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl boot "$UDID" || true
+            xcrun simctl bootstatus "$UDID" -b &
+            BOOT_PID2=$!
+            for i in $(seq 1 120); do
+              if ! kill -0 $BOOT_PID2 2>/dev/null; then break; fi
+              sleep 1
+            done
+            kill $BOOT_PID2 2>/dev/null || true
           fi
 
       - name: Run unit + UI tests (must fail job on failure)
